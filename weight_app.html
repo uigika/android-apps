@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><link rel="manifest" href="weight.webmanifest">
 <meta name="theme-color" content="#121212">
 <title>体重管理</title>
 <style>
@@ -27,6 +27,11 @@ th{color:var(--sb);font-weight:400;font-size:12px}td:first-child,th:first-child{
 dialog{background:var(--cd);color:var(--tx);border:1px solid var(--ln);border-radius:14px;width:92%;max-width:420px}
 dialog::backdrop{background:#000a}
 #ts{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:#333;padding:10px 18px;border-radius:20px;opacity:0;transition:.3s;pointer-events:none}
+body{padding-bottom:calc(84px + env(safe-area-inset-bottom))}
+nav{padding-bottom:env(safe-area-inset-bottom)}nav button{min-height:56px}
+button{min-height:48px}
+#sv{position:sticky;bottom:calc(72px + env(safe-area-inset-bottom))}
+.bn{display:flex;gap:10px;align-items:center;justify-content:space-between;background:#2d2a1a;border:1px solid #5a4d1a;border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:14px}
 </style></head><body>
 <div id="app"></div><div id="ts"></div><dialog id="md"></dialog>
 <nav><button data-v="in">記録</button><button data-v="gr">グラフ</button><button data-v="mo">月別</button><button data-v="hi">履歴</button></nav>
@@ -44,21 +49,24 @@ const gv=id=>+$('#'+id+'i').value+ +$('#'+id+'d').value/10;
 const stv=(id,v)=>{const[a,b]=LIM[id];v=Math.round(Math.min(b+.9,Math.max(a,v))*10)/10;const i=Math.floor(v+1e-9);$('#'+id+'i').value=i;$('#'+id+'d').value=Math.round((v-i)*10)};
 const df=(x,u)=>{if(x==null)return'-';x=Math.round(x*10)/10;return`<span class="${x>0?'up':x<0?'dn':''}">${x>0?'▲+':x<0?'▼−':'±'}${Math.abs(x).toFixed(1)}${u}</span>`};
 function toast(m){const t=$('#ts');t.textContent=m;t.style.opacity=1;setTimeout(()=>t.style.opacity=0,1500)}
+const gb=()=>{try{return localStorage.getItem('wt_bk')||''}catch(e){return''}};
+function bnr(){if(!D.length)return'';const b=gb(),r=b||srt()[D.length-1].t,n=Math.floor((Date.now()-new Date(r.slice(0,10)))/864e5);return n>=30?`<div class=bn><span>${b?`前回のバックアップから${n}日経過`:`CSV未出力（記録開始から${n}日）`}</span><button id=csv>CSV出力</button></div>`:''}
+function imp(x){let n=0;x.replace(/^\ufeff/,'').split(/\r?\n/).forEach(l=>{const c=l.split(','),t=(c[0]||'').trim().replace(' ','T').slice(0,16),w=parseFloat(c[1]),f=parseFloat(c[2]);if(!/^\d{4}-\d\d-\d\dT\d\d:\d\d$/.test(t)||isNaN(w)||isNaN(f)||D.some(r=>r.t==t))return;D.push({id:Date.now()+n,t,w,f});n++});sv();toast(n+'件を読み込みました');render()}
 function upd(){const t=$('#dt').value,p=srt().find(r=>r.t<t);
-$('#dw').innerHTML=p?`前回比 ${df(gv('w')-p.w,' kg')}`:'初回の記録です';
-$('#dfat').innerHTML=p?`前回比 ${df(gv('f')-p.f,' %')}`:''}
+$('#dw').innerHTML=p?`前回比 ${df(gv('w')-p.w,' kg')} <span class=sb>（前回 ${p.w.toFixed(1)}kg・${p.t.slice(5,10).replace('-','/')}）</span>`:'初回の記録です';
+$('#dfat').innerHTML=p?`前回比 ${df(gv('f')-p.f,' %')} <span class=sb>（前回 ${p.f.toFixed(1)}%）</span>`:''}
 function render(){
 document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v==V));
 const a=$('#app');
 if(V=='in'){const l=srt()[0]||{w:60,f:20};
-a.innerHTML=`<div class=cd><div class=sb>日時（自動・変更可）</div><input type=datetime-local id=dt value="${nowS()}" style="width:100%;margin-top:6px">
+a.innerHTML=`${bnr()}<div class=cd><div class=sb>日時（自動・変更可）</div><input type=datetime-local id=dt value="${nowS()}" style="width:100%;margin-top:6px">
 <div class=sb style="margin:18px 0 6px">体重 (kg)</div>${pair('w',l.w)}
 <div class=st><button data-a="w,-0.1">−0.1</button><button data-a="w,0.1">＋0.1</button></div><div id=dw class=d></div>
 <div class=sb style="margin:14px 0 6px">体脂肪率 (%)</div>${pair('f',l.f)}
 <div class=st><button data-a="f,-0.1">−0.1</button><button data-a="f,0.1">＋0.1</button></div><div id=dfat class=d></div>
 <button class=pri id=sv>記録する</button></div>`;upd()}
 else if(V=='gr'){
-a.innerHTML=`<div class=cd><div class=seg>${[['1W',7],['1M',30],['3M',91],['6M',182],['1Y',365]].map(([n,d])=>`<button class="${R==d?'on':''}" data-r=${d}>${n}</button>`).join('')}</div><canvas id=cv></canvas><div class=sb style="margin-top:8px"><span style=color:var(--ac)>● 体重（左軸）</span>　<span style=color:var(--ac2)>● 体脂肪率（右軸）</span></div></div>`;draw()}
+a.innerHTML=`<div class=cd><div class=seg>${[['1W',7],['1M',30],['3M',91],['6M',182],['1Y',365]].map(([n,d])=>`<button class="${R==d?'on':''}" data-r=${d}>${n}</button>`).join('')}</div><canvas id=cv></canvas><div id=sm style="margin:6px 0;font-size:14px"></div><div class=sb style="margin-top:8px"><span style=color:var(--ac)>● 体重（左軸）</span>　<span style=color:var(--ac2)>● 体脂肪率（右軸）</span></div></div>`;draw()}
 else if(V=='mo'){
 const m={};D.forEach(r=>(m[r.t.slice(0,7)]=m[r.t.slice(0,7)]||[]).push(r));
 const av=(a,k)=>a.reduce((s,x)=>s+x[k],0)/a.length;
@@ -66,11 +74,11 @@ const rows=Object.keys(m).sort().reverse().map(k=>{const y=+k.slice(0,4),mo=+k.s
 return`<tr><td>${y}/${mo}</td><td>${w.toFixed(1)}</td><td>${p?df(w-av(p,'w'),''):'-'}</td><td>${f.toFixed(1)}</td><td>${p?df(f-av(p,'f'),''):'-'}</td></tr>`}).join('');
 a.innerHTML=`<div class=cd><table><tr><th>月</th><th>平均体重kg</th><th>前月比</th><th>平均体脂肪%</th><th>前月比</th></tr>${rows||'<tr><td colspan=5 class=sb>記録なし</td></tr>'}</table></div>`}
 else{
-a.innerHTML=`<button id=csv class=pri style="margin:0 0 12px">CSV出力（端末のダウンロードに保存）</button><div class=cd>${srt().map(r=>`<div class=row data-e=${r.id}><span>${r.t.replace('T',' ')}</span><span>${r.w.toFixed(1)} kg　${r.f.toFixed(1)} %</span></div>`).join('')||'<div class=sb>記録なし</div>'}</div><div class=sb>行をタップで編集・削除</div>`}}
+a.innerHTML=`<button id=csv class=pri style="margin:0 0 12px">CSV出力（端末のダウンロードに保存）</button><button id=imp style="width:100%;margin-bottom:12px">CSV読み込み（復元・追加）</button><input type=file id=fi accept=".csv,text/csv" hidden><div class=cd>${srt().map(r=>`<div class=row data-e=${r.id}><span>${r.t.replace('T',' ')}</span><span>${r.w.toFixed(1)} kg　${r.f.toFixed(1)} %</span></div>`).join('')||'<div class=sb>記録なし</div>'}</div><div class=sb>行をタップで編集・削除　データ保護: ${PS}</div>`}}
 function draw(){const c=$('#cv');if(!c)return;
 const W=c.clientWidth,H=260,r=devicePixelRatio||1;c.width=W*r;c.height=H*r;const g=c.getContext('2d');g.scale(r,r);
 const t0=Date.now()-R*864e5,t1=Date.now(),rs=D.filter(x=>+new Date(x.t)>=t0).sort((a,b)=>a.t<b.t?-1:1);
-g.font='11px sans-serif';
+g.font='11px sans-serif';$('#sm').innerHTML=rs.length>1?`${rs.length}件｜体重 ${df(rs[rs.length-1].w-rs[0].w,' kg')}｜体脂肪 ${df(rs[rs.length-1].f-rs[0].f,' %')}`:'';
 if(!rs.length){g.fillStyle='#9a9a9a';g.textAlign='center';g.fillText('この期間のデータなし',W/2,H/2);return}
 const P={l:40,r:40,t:12,b:24},iw=W-P.l-P.r,ih=H-P.t-P.b,X=x=>P.l+iw*((+new Date(x.t)-t0)/(t1-t0));
 g.strokeStyle='#333';g.lineWidth=1;for(let i=0;i<=4;i++){const y=P.t+ih*i/4;g.beginPath();g.moveTo(P.l,y);g.lineTo(W-P.r,y);g.stroke()}
@@ -84,22 +92,25 @@ g.strokeStyle=col;g.lineWidth=2;g.beginPath();rs.forEach((x,i)=>i?g.lineTo(X(x),
 if(rs.length<60)rs.forEach(x=>{g.beginPath();g.arc(X(x),Y(x[k]),3,0,7);g.fill()})})}
 function exp(){const rows=[['日時','体重(kg)','体脂肪率(%)'],...[...D].sort((a,b)=>a.t<b.t?-1:1).map(r=>[r.t.replace('T',' '),r.w,r.f])];
 const b=new Blob(['\ufeff'+rows.map(r=>r.join(',')).join('\r\n')],{type:'text/csv'}),a=document.createElement('a');
-a.href=URL.createObjectURL(b);a.download=`weight_${nowS().slice(0,10).replace(/-/g,'')}.csv`;document.body.appendChild(a);a.click();a.remove();toast('CSVを保存しました')}
+a.href=URL.createObjectURL(b);a.download=`weight_${nowS().slice(0,10).replace(/-/g,'')}.csv`;document.body.appendChild(a);a.click();a.remove();try{localStorage.setItem('wt_bk',nowS())}catch(e){}toast('CSVを保存しました');render()}
 function openEd(id){const r=D.find(x=>x.id==id),m=$('#md');
 m.innerHTML=`<input type=datetime-local id=et value="${r.t}" style="width:100%"><div class=sb style="margin:12px 0 6px">体重 (kg)</div>${pair('mw',r.w)}<div class=sb style="margin:12px 0 6px">体脂肪率 (%)</div>${pair('mf',r.f)}
 <div class=pr style="margin-top:16px"><button id=mx style="flex:1">取消</button><button id=mdl style="flex:1;color:var(--up)">削除</button><button id=ms class=pri style="flex:2;margin:0;width:auto">保存</button></div>`;
 $('#mx').onclick=()=>m.close();
 $('#mdl').onclick=()=>{if(confirm('削除しますか？')){D=D.filter(x=>x.id!=id);sv();m.close();render()}};
 $('#ms').onclick=()=>{r.t=$('#et').value||r.t;r.w=gv('mw');r.f=gv('mf');sv();m.close();render()};m.showModal()}
-document.addEventListener('click',e=>{const t=e.target.closest('[data-v],[data-a],[data-r],[data-e],#sv,#csv');if(!t)return;
+document.addEventListener('click',e=>{const t=e.target.closest('[data-v],[data-a],[data-r],[data-e],#sv,#csv,#imp');if(!t)return;
 if(t.dataset.v){V=t.dataset.v;render()}
 else if(t.dataset.a){const[k,d]=t.dataset.a.split(',');stv(k,gv(k)+ +d);upd()}
 else if(t.dataset.r){R=+t.dataset.r;render()}
 else if(t.dataset.e)openEd(+t.dataset.e);
-else if(t.id=='sv'){D.push({id:Date.now(),t:$('#dt').value||nowS(),w:gv('w'),f:gv('f')});sv();dirty=false;toast('記録しました');render()}
-else if(t.id=='csv')exp()});
-document.addEventListener('change',e=>{if(e.target.id=='dt')dirty=true;if($('#dw')&&!$('#md').open)upd()});
+else if(t.id=='sv'){D.push({id:Date.now(),t:$('#dt').value||nowS(),w:gv('w'),f:gv('f')});sv();dirty=false;navigator.vibrate&&navigator.vibrate(30);toast('記録しました');render()}
+else if(t.id=='csv')exp();else if(t.id=='imp')$('#fi').click()});
+document.addEventListener('change',e=>{if(e.target.id=='fi'){const f=e.target.files[0];if(f)f.text().then(imp);e.target.value='';return}if(e.target.id=='dt')dirty=true;if($('#dw')&&!$('#md').open)upd()});
 addEventListener('resize',draw);
+let PS='未確認';try{navigator.storage.persist().then(r=>{PS=r?'保護中':'未保護（ブラウザ判断）'}).catch(()=>{})}catch(e){}
+if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+
 setInterval(()=>{if(V=='in'&&!dirty&&$('#dt'))$('#dt').value=nowS()},20000);
 render();
 </script></body></html>
