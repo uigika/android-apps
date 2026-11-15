@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#121212">
+<title>購入品管理</title>
+<style>
+:root{color-scheme:dark;--bg:#121212;--cd:#1e1e1e;--tx:#e8e8e8;--sb:#9a9a9a;--ac:#4fc3f7;--up:#ef5350;--dn:#66bb6a;--ln:#333}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px system-ui,sans-serif;padding:12px 12px 80px}
+.cd{background:var(--cd);border-radius:14px;padding:14px;margin-bottom:12px}
+.sb{color:var(--sb);font-size:13px}
+select,input,button{font:inherit;color:var(--tx);background:#2a2a2a;border:1px solid var(--ln);border-radius:10px;padding:12px}
+select{font-size:24px;padding:10px 2px;text-align:center;flex:1;min-width:0}
+.pr{display:flex;align-items:center;gap:4px}
+.big{font-size:38px;font-weight:700;margin:4px 0 10px}
+.pri{width:100%;background:var(--ac);color:#000;font-weight:700;font-size:18px;margin-top:16px;border:0;padding:16px}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:#1a1a1a;border-top:1px solid var(--ln)}
+nav button{flex:1;border:0;border-radius:0;background:none;padding:16px 0;color:var(--sb)}
+nav .on{color:var(--ac);font-weight:700}
+table{width:100%;border-collapse:collapse}td,th{padding:10px 3px;border-bottom:1px solid var(--ln);text-align:right}
+th{color:var(--sb);font-weight:400;font-size:12px}td:first-child,th:first-child{text-align:left}
+.up{color:var(--up)}.dn{color:var(--dn)}
+.row{display:flex;justify-content:space-between;gap:10px;padding:11px 0;border-bottom:1px solid var(--ln)}
+.row span:nth-child(2){flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kv{display:flex;justify-content:space-between;padding:5px 0}
+dialog{background:var(--cd);color:var(--tx);border:1px solid var(--ln);border-radius:14px;width:92%;max-width:420px}
+dialog::backdrop{background:#000a}
+#ts{position:fixed;top:14px;left:50%;transform:translateX(-50%);background:#333;padding:10px 18px;border-radius:20px;opacity:0;transition:.3s;pointer-events:none}
+</style></head><body>
+<div id="app"></div><div id="ts"></div><dialog id="md"></dialog>
+<nav><button data-v="in">入力</button><button data-v="mo">月別</button><button data-v="hi">履歴</button><button data-v="st">設定</button></nav>
+<script>
+const $=s=>document.querySelector(s),pad=n=>String(n).padStart(2,'0'),K='bu_v1',KS='bu_set';
+const today=()=>{const d=new Date();return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>'&#'+c.charCodeAt(0)+';');
+const yen=n=>(n<0?'−':'')+'¥'+Math.abs(n).toLocaleString();
+const mi=s=>+s.slice(0,4)*12+ +s.slice(5,7)-1,ml=c=>`${Math.floor(c/12)}年${c%12+1}月`;
+let E=[],S=null,V='in',dirty=false;
+try{E=JSON.parse(localStorage.getItem(K))||[]}catch(e){}
+try{S=JSON.parse(localStorage.getItem(KS))}catch(e){}
+const Y=new Date().getFullYear();S=S||{s:`${Y}-01-01`,e:`${Y}-12-31`,t:600000};
+const sv=()=>{try{localStorage.setItem(K,JSON.stringify(E));localStorage.setItem(KS,JSON.stringify(S))}catch(e){}};
+const op=(a,b,v)=>{let s='';for(let i=a;i<=b;i++)s+=`<option${i==v?' selected':''}>${i}</option>`;return s};
+const amt=(p,v)=>{const m=Math.floor(v/1e4),t=Math.floor(v%1e4/1e3),h=Math.floor(v%1e3/100);return`<div class=pr><select id=${p}m>${op(0,99,m)}</select>万<select id=${p}t>${op(0,9,t)}</select>千<select id=${p}h>${op(0,9,h)}</select>百円</div>`};
+const ga=p=>$('#'+p+'m').value*1e4+$('#'+p+'t').value*1e3+$('#'+p+'h').value*100;
+function toast(m){const t=$('#ts');t.textContent=m;t.style.opacity=1;setTimeout(()=>t.style.opacity=0,1500)}
+function calc(){
+const N=Math.max(1,mi(S.e)-mi(S.s)+1),al=Math.round(S.t/N),a=mi(S.s),c=Math.min(mi(S.e),Math.max(a,mi(today())));
+const P=E.filter(x=>x.d>=S.s&&x.d<=S.e),sum=l=>l.reduce((s,x)=>s+x.a,0);
+const before=sum(P.filter(x=>mi(x.d)<c)),cur=sum(P.filter(x=>mi(x.d)==c)),all=sum(P);
+const carry=(c-a)*al-before;
+return{N,al,c,carry,cur,avail:al+carry,rem:al+carry-cur,left:S.t-all,list:P.filter(x=>mi(x.d)==c).sort((a,b)=>a.d<b.d?1:-1)}}
+const rowH=x=>`<div class=row data-e=${x.id}><span class=sb>${x.d.slice(5).replace('-','/')}</span><span>${esc(x.n)||'（内容なし）'}</span><span>${yen(x.a)}</span></div>`;
+function pv(){const c=calc(),a=ga('a');$('#pv').innerHTML=`記録後の残り <b class="${c.rem-a<0?'up':''}">${yen(c.rem-a)}</b>`}
+function render(){
+document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v==V));
+const a=$('#app');
+if(V=='in'){const c=calc(),out=today()<S.s||today()>S.e;
+a.innerHTML=`<div class=cd><div class=sb>${ml(c.c)}に自由に使える残り</div>
+<div class="big ${c.rem<0?'up':''}">${yen(c.rem)}</div>
+<div class=kv><span class=sb>今月の基本額</span><span>${yen(c.al)}</span></div>
+<div class=kv><span class=sb>先月までの繰越</span><span class="${c.carry<0?'up':c.carry>0?'dn':''}">${yen(c.carry)}</span></div>
+<div class=kv><span class=sb>今月の使用額</span><span>${yen(c.cur)}</span></div>
+<div class=kv><span class=sb>期間（〜${S.e.replace(/-/g,'/')}）の残り総額</span><span>${yen(c.left)}</span></div>
+${out?'<div class=up style="margin-top:8px;font-size:13px">※ 今日は設定期間外です。設定を更新してください。</div>':''}</div>
+<div class=cd><div class=sb>日付（自動・変更可）</div><input type=date id=d value="${today()}" style="width:100%;margin:6px 0 14px">
+<input id=n placeholder="内容（購入品・購入店など）" style="width:100%;margin-bottom:14px">
+<div class=sb style="margin-bottom:6px">金額（99円以下は省略）</div>${amt('a',0)}
+<div id=pv style="margin-top:10px;font-size:17px"></div><button class=pri id=sv>記録する</button></div>
+<div class=cd><div class=sb style="margin-bottom:4px">今月の記録（タップで編集）</div>${c.list.map(rowH).join('')||'<div class=sb>記録なし</div>'}</div>`;pv()}
+else if(V=='mo'){
+const m={};E.forEach(x=>m[x.d.slice(0,7)]=(m[x.d.slice(0,7)]||0)+x.a);
+const rows=Object.keys(m).sort().reverse().map(k=>{const y=+k.slice(0,4),mo=+k.slice(5),pk=mo==1?`${y-1}-12`:`${y}-${pad(mo-1)}`,d=pk in m?m[k]-m[pk]:null;
+return`<tr><td>${y}/${mo}</td><td>${yen(m[k])}</td><td>${d==null?'-':`<span class="${d>0?'up':d<0?'dn':''}">${d>0?'▲+':d<0?'▼−':'±'}${Math.abs(d).toLocaleString()}</span>`}</td></tr>`}).join('');
+a.innerHTML=`<div class=cd><table><tr><th>月</th><th>使用合計</th><th>前月比</th></tr>${rows||'<tr><td colspan=3 class=sb>記録なし</td></tr>'}</table></div>`}
+else if(V=='hi'){
+a.innerHTML=`<button id=csv class=pri style="margin:0 0 12px">CSV出力（端末のダウンロードに保存）</button><div class=cd>${[...E].sort((a,b)=>a.d<b.d?1:-1).map(x=>rowH({...x,d:x.d.slice(2)})).join('')||'<div class=sb>記録なし</div>'}</div><div class=sb>行をタップで編集・削除</div>`}
+else{
+a.innerHTML=`<div class=cd><div class=sb>「今年」の期間（手動変更可）</div>
+<div class=pr style="margin:6px 0 14px"><input type=date id=ss value="${S.s}" style="flex:1;min-width:0"><span>〜</span><input type=date id=se value="${S.e}" style="flex:1;min-width:0"></div>
+<div class=sb style="margin-bottom:6px">期間中に自由に使える総額</div>
+<div class=pr><select id=tm>${op(0,999,Math.floor(S.t/1e4))}</select>万<select id=tt>${op(0,9,Math.floor(S.t%1e4/1e3))}</select>千円</div>
+<div id=sp class=sb style="margin-top:10px"></div><button class=pri id=ssv>設定を保存</button></div>
+<div class=sb>期間の開始日より前・終了日より後の記録は、月の予算計算に含まれません。期間を変えると繰越も再計算されます。</div>`;sp()}}
+function sp(){const t=$('#tm').value*1e4+$('#tt').value*1e3,N=Math.max(1,mi($('#se').value)-mi($('#ss').value)+1);$('#sp').textContent=`${N}か月 → 月の基本額 ${yen(Math.round(t/N))}`}
+function exp(){const q=s=>'"'+String(s).replace(/"/g,'""')+'"';
+const rows=[['日付','内容','金額'],...[...E].sort((a,b)=>a.d<b.d?-1:1).map(x=>[x.d,q(x.n),x.a])];
+const b=new Blob(['\ufeff'+rows.map(r=>r.join(',')).join('\r\n')],{type:'text/csv'}),a=document.createElement('a');
+a.href=URL.createObjectURL(b);a.download=`spending_${today().replace(/-/g,'')}.csv`;document.body.appendChild(a);a.click();a.remove();toast('CSVを保存しました')}
+function openEd(id){const x=E.find(v=>v.id==id),m=$('#md');
+m.innerHTML=`<input type=date id=ed value="${x.d}" style="width:100%;margin-bottom:12px"><input id=en value="${esc(x.n)}" placeholder="内容" style="width:100%;margin-bottom:12px">${amt('e',x.a)}
+<div class=pr style="margin-top:16px"><button id=mx style="flex:1">取消</button><button id=mdl style="flex:1;color:var(--up)">削除</button><button id=ms class=pri style="flex:2;margin:0;width:auto">保存</button></div>`;
+$('#mx').onclick=()=>m.close();
+$('#mdl').onclick=()=>{if(confirm('削除しますか？')){E=E.filter(v=>v.id!=id);sv();m.close();render()}};
+$('#ms').onclick=()=>{x.d=$('#ed').value||x.d;x.n=$('#en').value;x.a=ga('e');sv();m.close();render()};m.showModal()}
+document.addEventListener('click',e=>{const t=e.target.closest('[data-v],[data-e],#sv,#ssv,#csv');if(!t)return;
+if(t.dataset.v){V=t.dataset.v;render()}
+else if(t.dataset.e)openEd(+t.dataset.e);
+else if(t.id=='sv'){const a=ga('a');if(!a)return toast('金額を選んでください');
+E.push({id:Date.now(),d:$('#d').value||today(),n:$('#n').value,a});sv();dirty=false;toast('記録しました');render()}
+else if(t.id=='ssv'){const s=$('#ss').value,en=$('#se').value;if(!s||!en||en<s)return toast('期間を確認してください');
+S={s,e:en,t:$('#tm').value*1e4+$('#tt').value*1e3};sv();toast('設定を保存しました');V='in';render()}
+else if(t.id=='csv')exp()});
+document.addEventListener('change',e=>{if(e.target.id=='d')dirty=true;if($('#pv')&&!$('#md').open)pv();if($('#sp'))sp()});
+setInterval(()=>{if(V=='in'&&!dirty&&$('#d'))$('#d').value=today()},60000);
+render();
+</script></body></html>
